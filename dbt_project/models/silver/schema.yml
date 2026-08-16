@@ -1,0 +1,57 @@
+version: 2
+
+models:
+  - name: telco_silver
+    description: >
+      Conformed customer table, one row per (customer_id, snapshot_date).
+      Built via incremental MERGE from the staging layer. Equivalent to
+      telco_silver in the PySpark pipeline.
+    columns:
+      - name: customer_id
+        description: Primary key (with snapshot_date). Trimmed from Bronze.
+        tests:
+          - not_null
+      - name: snapshot_date
+        description: Business date of this customer snapshot.
+        tests:
+          - not_null
+      - name: churn_label
+        description: "1 = churned, 0 = retained."
+        tests:
+          - not_null
+          - accepted_values:
+              values: [0, 1]
+      - name: senior_citizen
+        tests:
+          - not_null
+      - name: monthly_charges
+        tests:
+          - not_null
+      - name: tenure
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+      - name: contract
+        tests:
+          - not_null
+          - accepted_values:
+              values:
+                - Month-to-month
+                - One year
+                - Two year
+      - name: internet_service
+        tests:
+          - not_null
+          - accepted_values:
+              values:
+                - DSL
+                - Fiber optic
+                - "No"
+
+    tests:
+      # Composite uniqueness — equivalent to the duplicate check in transform.py
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns:
+            - customer_id
+            - snapshot_date

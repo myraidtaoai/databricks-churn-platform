@@ -1,0 +1,52 @@
+# ──────────────────────────────────────────────────────────────────────
+# dbt project for the Telco Churn Platform
+#
+# This project handles the SQL-expressible transformation layer:
+# Bronze -> Silver -> Gold (features, labels, summary).
+#
+# The ML pipeline (training, scoring, promotion, rollback) remains as
+# PySpark tasks — dbt is a transformation tool, not an ML orchestrator.
+# ──────────────────────────────────────────────────────────────────────
+
+name: churn_platform
+profile: databricks_churn
+version: "1.0.0"
+config-version: 2
+
+profile: databricks_churn
+
+# ── Variables ────────────────────────────────────────────────────────
+# Business parameters only. Catalog and schema come from the profile
+# target (profiles.yml), not from here.
+# Override at runtime:  dbt run --vars '{label_horizon_days: 60}'
+vars:
+  # ── Business parameters ───────────────────────────────────────────
+  # Label horizon: number of days after as_of_date to observe churn outcome.
+  label_horizon_days: 30
+  # Snapshot date for the Gold models. Empty string means "yesterday".
+  # Override:  dbt run -s gold_feature_snapshot --vars '{as_of_date: "2026-08-01"}'
+  # Declared here so var() always resolves, even when not passed on the CLI.
+  as_of_date: ""
+
+# ── Model defaults ───────────────────────────────────────────────────
+# Models land in the schema set by the active profile target
+# (DBT_SCHEMA env var). Do NOT set +schema here — dbt evaluates these
+# configs before project vars are bound, so var() fails at parse time.
+models:
+  churn_platform:
+    staging:
+      +materialized: view
+    silver:
+      +materialized: incremental
+    gold:
+      +materialized: table
+
+# ── Test severity ────────────────────────────────────────────────────
+tests:
+  churn_platform:
+    +severity: warn  # default; override per-test in schema.yml
+
+# ── Clean targets ────────────────────────────────────────────────────
+clean-targets:
+  - target
+  - dbt_packages

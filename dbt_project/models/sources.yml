@@ -1,0 +1,79 @@
+# ──────────────────────────────────────────────────────────────────────
+# Source definitions — Bronze tables produced by PySpark ingestion jobs
+#
+# These tables are NOT managed by dbt. They are created by:
+#   - churn_seed_bronze  (CSV -> telco_bronze)
+#   - churn_event_generator + Auto Loader (events -> telco_events_bronze)
+#
+# dbt treats them as read-only inputs via the source() function.
+# ──────────────────────────────────────────────────────────────────────
+version: 2
+
+sources:
+  - name: bronze
+    description: >
+      Raw Bronze tables ingested by the PySpark pipeline.
+      These are the upstream inputs that dbt transforms into Silver and Gold.
+      Reference them in models with source('bronze', '<table_name>').
+    # Asset Bundle development mode prefixes the deployed schema (for example,
+    # churn_dev becomes dev_<user>_churn_dev). The dbt target is configured
+    # with that resolved name, so use it by default instead of the unprefixed
+    # bundle variable. Override these only when Bronze is deliberately hosted
+    # in a different catalog or schema from the dbt models.
+    database: "{{ env_var('DBT_SOURCE_CATALOG', target.database) }}"
+    schema: "{{ env_var('DBT_SOURCE_SCHEMA', target.schema) }}"
+
+    tables:
+      - name: telco_bronze
+        description: >
+          Historical customer snapshot from the Telco Customer Churn CSV.
+          One row per customer with demographics, services, and churn status.
+          Loaded by the churn_seed_bronze job (idempotent).
+        columns:
+          - name: customerID
+            description: Original customer identifier (will be trimmed in staging).
+            tests:
+              - not_null
+          - name: MonthlyCharges
+            tests:
+              - not_null
+          - name: Churn
+            description: "Yes/No churn status from the source CSV."
+            tests:
+              - not_null
+              - accepted_values:
+                  values: ["Yes", "No", "yes", "no"]
+                  quote: true
+
+      - name: telco_events_bronze
+        description: >
+          Customer events ingested via Auto Loader from the landing Volume.
+          Each row is a single event (payment, support_call, complaint, etc.)
+          with a deterministic event_id for dedup.
+        columns:
+          - name: event_id
+            description: Deterministic SHA-256 identifier for dedup.
+            tests:
+              - not_null
+              - unique
+          - name: customer_id
+            description: Source customer identifier.
+            tests:
+              - not_null
+          - name: event_type
+            description: One of the contract-defined event types.
+            tests:
+              - not_null
+              - accepted_values:
+                  values:
+                    - billing
+                    - cancellation
+                    - complaint
+                    - payment
+                    - plan_change
+                    - support_call
+                    - usage
+          - name: event_ts
+            description: "UTC timestamp of the event (ISO-8601)."
+            tests:
+              - not_null

@@ -9,3 +9,11 @@ __pycache__/
 plans/
 .ruff_cache/
 connectors/
+.dbt
+# dbt
+dbt_project/dbt_packages/
+dbt_project/target/
+dbt_project/logs/
+logs/
+dbt_project/.user.yml
+dbt_project/.DS_Store

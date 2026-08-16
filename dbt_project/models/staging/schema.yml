@@ -1,0 +1,59 @@
+version: 2
+
+models:
+  - name: stg_telco_bronze
+    description: >
+      Cleaned and renamed customer snapshot from Bronze.
+      One row per customer with standardized column names and types.
+    columns:
+      - name: customer_id
+        description: Trimmed customer identifier.
+        tests:
+          - not_null
+          - unique
+      - name: churn_label
+        description: "Binary churn indicator: 1 = churned, 0 = retained."
+        tests:
+          - not_null
+          - accepted_values:
+              values: [0, 1]
+      - name: senior_citizen
+        tests:
+          - not_null
+      - name: monthly_charges
+        tests:
+          - not_null
+      - name: tenure
+        description: Months with the company. Must be non-negative.
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+
+  - name: stg_events_bronze
+    description: >
+      Standardized event records from the events Bronze table.
+      One row per customer event with typed timestamps.
+    columns:
+      - name: event_id
+        tests:
+          - not_null
+          - unique
+      - name: customer_id
+        tests:
+          - not_null
+      - name: event_type
+        tests:
+          - not_null
+          - accepted_values:
+              values:
+                - billing
+                - cancellation
+                - complaint
+                - payment
+                - plan_change
+                - support_call
+                - usage
+      - name: event_ts
+        tests:
+          - not_null
