@@ -1,6 +1,6 @@
 # Asset Bundles for the Telco Customer Churn project.
 bundle:
-  name: databricks-churn-platform
+  name: churn-prediction
 
 include:
   - resources/*.yml
