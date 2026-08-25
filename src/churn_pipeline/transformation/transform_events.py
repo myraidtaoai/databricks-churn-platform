@@ -65,7 +65,9 @@ silver_columns = [
 ]
 missing_columns = sorted(set(silver_columns).difference(bronze.columns))
 if missing_columns:
-    raise ValueError(f"Bronze events table is missing required columns: {missing_columns}")
+    raise ValueError(
+        f"Bronze events table is missing required columns: {missing_columns}"
+    )
 
 silver = bronze.select(*silver_columns).withColumn(
     "_transformed_at", F.lit(datetime.now(timezone.utc)).cast("timestamp")
