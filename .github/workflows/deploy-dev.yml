@@ -52,6 +52,11 @@ jobs:
         run: >-
           databricks bundle validate -t dev
           --var="warehouse_id=${DATABRICKS_WAREHOUSE_ID}"
+      
+      - name: Preview Dev deployment
+        run: >-
+          databricks bundle plan -t dev
+          --var="warehouse_id=${DATABRICKS_WAREHOUSE_ID}"
 
       - name: Deploy Dev bundle
         run: >-
