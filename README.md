@@ -3,6 +3,7 @@
 ![Databricks](https://img.shields.io/badge/Databricks-FF3621?style=flat-square&logo=databricks&logoColor=white)
 ![Python](https://img.shields.io/badge/Python-3.12-3776AB?style=flat-square&logo=python&logoColor=white)
 ![MLflow](https://img.shields.io/badge/MLflow-Tracking-0194E2?style=flat-square&logo=mlflow&logoColor=white)
+![dbt](https://img.shields.io/badge/dbt-Transformations-FF694B?style=flat-square&logo=dbt&logoColor=white)
 ![Serverless](https://img.shields.io/badge/Compute-Serverless-6F42C1?style=flat-square&logo=apache-spark&logoColor=white)
 ![Asset Bundles](https://img.shields.io/badge/IaC-Asset%20Bundles-FF3621?style=flat-square&logo=databricks&logoColor=white)
 [![CI](https://github.com/myraidtaoai/databricks-churn-platform/actions/workflows/ci.yml/badge.svg)](https://github.com/myraidtaoai/databricks-churn-platform/actions/workflows/ci.yml)
@@ -65,13 +66,15 @@ flowchart TD
 
 Full diagram, layer contracts, design decisions, and the failure/recovery matrix: **[docs/architecture.md](docs/architecture.md)**.
 
+The medallion stage of that flow has two implementations against the same Bronze tables: the PySpark jobs in `src/churn_pipeline/transformation/`, and an equivalent dbt project in `dbt_project/`. Ingestion and the model lifecycle stay in PySpark, since file I/O, Auto Loader checkpoints, MLflow, and Spark UDF scoring are not SQL problems.
+
 ## Dashboard
 
 ![Telco Churn exploration and model results dashboard](docs/images/Telco-Churn-Exploration-Model-Results.jpg)
 ![Telco Churn pipeline observability dashboard](docs/images/Pipeline-Observability.jpg)
 View the full dashboard PDF →
 [Data Exploraton and Model Results](outputs/Telco-Churn-Exploration-Model-Results.pdf)
-[Pipeline Observability](outputs/Telco-Churn-Pipeline-Observability.pdf)
+[Pipeline Observability](outputs/Pipeline-Observability.pdf)
 
 
 ## What this demonstrates
@@ -94,6 +97,7 @@ View the full dashboard PDF →
 | Reproducible synthetic data | Same date + seed + drift level yields byte-identical events; conflicting rewrites are rejected | `src/churn_pipeline/ingestion/generate_events.py` |
 | Model explainability | SHAP over a held-out sample, published to a table the dashboard reads | `src/churn_pipeline/modeling/train.py` |
 | Tested | 19 test modules, 167 tests covering ETL idempotency, quality, drift, promotion, inference contract, bundle/dashboard contracts | `tests/` |
+| Declarative transformations | The same Bronze→Silver→Gold logic expressed a second time in dbt — incremental MERGE, Jinja-generated window features, schema tests, generated lineage docs | `dbt_project/` |
 
 ## Roadmap
 
@@ -112,6 +116,7 @@ The platform is being hardened along a documented plan: **[plans/implementation-
 - [x] Pipeline observability — run logging, data quality metrics, AI/BI dashboard
 - [x] Drift monitoring — PSI + KS statistics, standalone job, dashboard widgets
 - [x] Scheduled production pipeline — event gen, data + scoring, biweekly retraining
+- [x] dbt transformation layer — the medallion expressed declaratively, alongside the PySpark implementation
 
 ## Deliberate non-goals
 
@@ -205,6 +210,48 @@ The first deployment of the versioned inference contract must run the model pipe
 </details>
 
 <details>
+<summary><b>dbt transformation layer</b></summary>
+
+The medallion transformations exist twice in this repository, deliberately. `src/churn_pipeline/transformation/` implements them imperatively in PySpark; `dbt_project/` implements the same logic declaratively in dbt. Neither replaces the other — running both against the same Bronze tables is what makes the comparison legible.
+
+| PySpark | dbt model | What changes |
+|---|---|---|
+| `transform.py` (select/cast) | `stg_telco_bronze` | Column renames become a staging view |
+| `transform.py` (MERGE + quality) | `telco_silver` | 40 lines of table-exists checks and hand-written MERGE collapse into `materialized='incremental'` |
+| `transform.py` (Gold aggregate) | `churn_summary` | Unchanged in substance |
+| `transform_events.py` (EVENT_RULES quarantine) | `stg_events_bronze`, `telco_events_silver` | Quarantine-severity rules become a `WHERE` filter; WARN-severity rules stay as `schema.yml` tests |
+| `build_features.py` | `gold_feature_snapshot` | Repeated 7/30/90-day window blocks become Jinja loops |
+| `generate_labels.py` | `gold_labels`, `training_dataset` | Delayed labels and the training view |
+| `quality.py` rules | `schema.yml` tests | Imperative rule engine becomes declarative YAML |
+
+dbt reads Bronze but never creates it. `telco_bronze` and `telco_events_bronze` come from the bundle jobs, so deploy and seed before running dbt:
+
+```bash
+databricks bundle deploy -t dev --var="warehouse_id=<warehouse-id>"
+databricks bundle run churn_seed_bronze -t dev --var="warehouse_id=<warehouse-id>"
+```
+
+Then:
+
+```bash
+export DBT_DATABRICKS_HOST="<workspace-host>"        # bare hostname, no https://
+export DBT_DATABRICKS_HTTP_PATH="/sql/1.0/warehouses/<warehouse-id>"
+export DBT_DATABRICKS_TOKEN="<token>"
+
+cd dbt_project
+dbt deps
+dbt run
+dbt test
+dbt docs generate && dbt docs serve
+```
+
+Catalog and schema resolve from the profile target. Source tables are deliberately decoupled from it via the `source_catalog` and `source_schema` variables, so dbt writes to a personal development schema while always reading Bronze from the schema the bundle deployed.
+
+Full setup, model-by-model notes, and troubleshooting: **[dbt_project/README.md](dbt_project/README.md)**.
+
+</details>
+
+<details>
 <summary><b>The model</b></summary>
 
 The training task compares `BalancedRandomForestClassifier`, XGBoost, LightGBM, and Extra Trees. It uses a stratified train/validation/test split, applies each model's appropriate class-imbalance method, and selects the candidate with the best validation PR-AUC. It picks a classification threshold from validation data and publishes PR-AUC, ROC-AUC, precision, recall, F1, and balanced accuracy for the dashboard. It also calculates Shapley values on a representative held-out sample and writes global feature impact to `shap_feature_importance`.
@@ -279,6 +326,7 @@ Three jobs are scheduled in production: the event generator runs daily at 5 AM (
 |---|---|
 | [Architecture](docs/architecture.md) | Full diagram, layer contracts, design decisions, failure/recovery matrix |
 | [Implementation plan](plans/implementation-plan.md) | Current-state audit, phased tasks with acceptance criteria, execution order |
+| [dbt project](dbt_project/README.md) | Setup, model layout, materializations, tests, PySpark↔dbt mapping |
 | [Event generation](docs/event-generation.md) | Simulation contract, landing layout, drift behavior |
 | [Deployment](docs/deployment.md) | PAT auth and environment setup |
 

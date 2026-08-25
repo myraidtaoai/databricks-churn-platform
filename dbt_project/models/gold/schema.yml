@@ -1,0 +1,97 @@
+version: 2
+
+models:
+  - name: gold_feature_snapshot
+    description: >
+      Point-in-time customer feature snapshot. Features are computed from
+      events with event_ts <= as_of_date only (leakage boundary). Enriched
+      with static Silver attributes. Keyed by customer_id and snapshot_date.
+    columns:
+      - name: customer_id
+        tests:
+          - not_null
+      - name: snapshot_date
+        tests:
+          - not_null
+      - name: payment_count_30d
+        description: Total payment events in the last 30 days.
+        tests:
+          - dbt_utils.accepted_range:
+              min_value: 0
+      - name: payment_failure_rate_30d
+        description: "Ratio of failed payments (0.0 to 1.0)."
+        tests:
+          - dbt_utils.accepted_range:
+              min_value: 0
+              max_value: 1
+              inclusive: true
+      - name: days_since_last_activity
+        tests:
+          - dbt_utils.accepted_range:
+              min_value: 0
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns:
+            - customer_id
+            - snapshot_date
+
+  - name: gold_labels
+    description: >
+      Delayed churn labels. A customer is labeled churned=1 if they had a
+      cancellation event within label_horizon_days after the snapshot date.
+      Labels are only valid after the maturity_date has passed.
+    columns:
+      - name: customer_id
+        tests:
+          - not_null
+      - name: snapshot_date
+        tests:
+          - not_null
+      - name: churned
+        description: "Binary churn label: 1 = churned within horizon, 0 = retained."
+        tests:
+          - not_null
+          - accepted_values:
+              values: [0, 1]
+      - name: label_horizon_days
+        tests:
+          - not_null
+      - name: maturity_date
+        tests:
+          - not_null
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns:
+            - customer_id
+            - snapshot_date
+
+  - name: training_dataset
+    description: >
+      View joining gold_feature_snapshot to gold_labels. This is the table
+      the ML training job reads from. Only contains rows with matured labels.
+    columns:
+      - name: customer_id
+        tests:
+          - not_null
+      - name: churned
+        tests:
+          - not_null
+
+  - name: churn_summary
+    description: >
+      Aggregate churn rate by contract type, internet service, and payment
+      method. Powers the AI/BI dashboard.
+    columns:
+      - name: contract
+        tests:
+          - not_null
+      - name: customers
+        tests:
+          - dbt_utils.accepted_range:
+              min_value: 1
+      - name: churn_rate
+        tests:
+          - dbt_utils.accepted_range:
+              min_value: 0
+              max_value: 1
+              inclusive: true

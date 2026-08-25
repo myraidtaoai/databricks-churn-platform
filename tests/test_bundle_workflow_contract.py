@@ -38,13 +38,18 @@ def test_job_tasks_preserve_required_execution_order():
     assert [task["task_key"] for task in data_tasks] == [
         "ingest_events",
         "transform_silver_and_gold",
+        "transform_events",
         "build_features",
         "generate_labels",
     ]
     assert "depends_on" not in data_tasks[0]  # ingest_events is the first task
     assert data_tasks[1]["depends_on"] == [{"task_key": "ingest_events"}]
-    assert data_tasks[2]["depends_on"] == [{"task_key": "transform_silver_and_gold"}]
-    assert data_tasks[3]["depends_on"] == [{"task_key": "build_features"}]
+    assert data_tasks[2]["depends_on"] == [{"task_key": "ingest_events"}]
+    assert data_tasks[3]["depends_on"] == [
+        {"task_key": "transform_silver_and_gold"},
+        {"task_key": "transform_events"},
+    ]
+    assert data_tasks[4]["depends_on"] == [{"task_key": "build_features"}]
 
     assert [task["task_key"] for task in model_tasks] == [
         "train_and_register_model",

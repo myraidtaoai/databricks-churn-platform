@@ -1,0 +1,41 @@
+# ──────────────────────────────────────────────────────────────────────
+# dbt profile for Databricks connection
+#
+# SETUP:
+# 1. Install dbt-databricks:
+#      pip install dbt-databricks
+#
+# 2. Get your Databricks connection details:
+#    - Host:        your workspace URL (e.g., adb-1234567890.12.azuredatabricks.net)
+#    - HTTP path:   from SQL Warehouse > Connection Details
+#    - Token:       from User Settings > Developer > Access Tokens
+#
+# 3. Option A — use this file (copy to ~/.dbt/profiles.yml)
+#    Option B — set environment variables (recommended for CI):
+#      export DBT_DATABRICKS_HOST=adb-xxx.xx.azuredatabricks.net
+#      export DBT_DATABRICKS_HTTP_PATH=/sql/1.0/warehouses/xxxxx
+#      export DBT_DATABRICKS_TOKEN=dapi_xxxxxxxx
+#
+# IMPORTANT: Never commit tokens to version control.
+# ──────────────────────────────────────────────────────────────────────
+
+databricks_churn:
+  target: dev
+  outputs:
+    dev:
+      type: databricks
+      catalog: "{{ env_var('DBT_CATALOG', 'main') }}"
+      schema: "{{ env_var('DBT_SCHEMA', 'dev_myraidtaoai_churn_dev') }}"
+      host: "{{ env_var('DBT_DATABRICKS_HOST') }}"
+      http_path: "{{ env_var('DBT_DATABRICKS_HTTP_PATH') }}"
+      token: "{{ env_var('DBT_DATABRICKS_TOKEN') }}"
+      threads: 4
+
+    prod:
+      type: databricks
+      catalog: "{{ env_var('DBT_CATALOG', 'main') }}"
+      schema: churn
+      host: "{{ env_var('DBT_DATABRICKS_HOST') }}"
+      http_path: "{{ env_var('DBT_DATABRICKS_HTTP_PATH') }}"
+      token: "{{ env_var('DBT_DATABRICKS_TOKEN') }}"
+      threads: 4
