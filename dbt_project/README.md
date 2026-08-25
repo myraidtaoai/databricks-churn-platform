@@ -140,6 +140,7 @@ dbt_project/
 │   │
 │   ├── silver/               # Conformed, deduplicated (incremental MERGE)
 │   │   ├── telco_silver.sql
+│   │   ├── telco_events_silver.sql
 │   │   └── schema.yml
 │   │
 │   └── gold/                 # Business-ready tables for ML and dashboards
@@ -240,6 +241,7 @@ Do not use `{{ var('schema') }}` inside the `models:` block of `dbt_project.yml`
 | `transform.py` (column selection) | `stg_telco_bronze.sql` | Rename, cast, trim |
 | `transform.py` (MERGE + quality) | `telco_silver.sql` | Incremental merge; quality rules become dbt tests |
 | `transform.py` (Gold aggregate) | `churn_summary.sql` | Simple GROUP BY |
+| `transform_events.py` (EVENT_RULES) | `stg_events_bronze.sql`, `telco_events_silver.sql` | Quarantine-severity rules become a `WHERE` filter |
 | `build_features.py` | `gold_feature_snapshot.sql` | Windowed aggregates with Jinja loops |
 | `generate_labels.py` | `gold_labels.sql` + `training_dataset.sql` | Delayed labels + view |
 | `quality.py` (rules) | `schema.yml` (tests) | Declarative instead of imperative |

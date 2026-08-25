@@ -219,6 +219,7 @@ The medallion transformations exist twice in this repository, deliberately. `src
 | `transform.py` (select/cast) | `stg_telco_bronze` | Column renames become a staging view |
 | `transform.py` (MERGE + quality) | `telco_silver` | 40 lines of table-exists checks and hand-written MERGE collapse into `materialized='incremental'` |
 | `transform.py` (Gold aggregate) | `churn_summary` | Unchanged in substance |
+| `transform_events.py` (EVENT_RULES quarantine) | `stg_events_bronze`, `telco_events_silver` | Quarantine-severity rules become a `WHERE` filter; WARN-severity rules stay as `schema.yml` tests |
 | `build_features.py` | `gold_feature_snapshot` | Repeated 7/30/90-day window blocks become Jinja loops |
 | `generate_labels.py` | `gold_labels`, `training_dataset` | Delayed labels and the training view |
 | `quality.py` rules | `schema.yml` tests | Imperative rule engine becomes declarative YAML |

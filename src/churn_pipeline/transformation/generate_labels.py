@@ -6,7 +6,7 @@ of target leakage in churn models: using an outcome that had not yet
 occurred at the time features were computed.
 
 A customer is labeled ``churned = 1`` if a cancellation event exists in
-``telco_events_bronze`` with ``event_ts`` in the half-open window
+``telco_events_silver`` with ``event_ts`` in the half-open window
 ``(as_of_date, as_of_date + LABEL_HORIZON_DAYS]``.  Otherwise ``churned = 0``.
 
 The ``training_dataset`` view is created (or replaced) to join
@@ -89,7 +89,7 @@ if today < maturity_date:
     )
 else:
     # ── Determine churn outcome ──────────────────────────────────────
-    events_table = table(args.catalog, args.schema, "telco_events_bronze")
+    events_table = table(args.catalog, args.schema, "telco_events_silver")
 
     # Window: strictly after as_of_date, up to and including maturity_date.
     label_start = str(as_of_date) + "T23:59:59"

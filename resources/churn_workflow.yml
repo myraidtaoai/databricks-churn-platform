@@ -141,8 +141,18 @@ resources:
               - ${resources.schemas.churn_schema.catalog_name}
               - --schema
               - ${resources.schemas.churn_schema.name}
+        - task_key: transform_events
+          depends_on: [{task_key: ingest_events}]
+          environment_key: etl_v4
+          spark_python_task:
+            python_file: "../src/churn_pipeline/transformation/transform_events.py"
+            parameters:
+              - --catalog
+              - ${resources.schemas.churn_schema.catalog_name}
+              - --schema
+              - ${resources.schemas.churn_schema.name}
         - task_key: build_features
-          depends_on: [{task_key: transform_silver_and_gold}]
+          depends_on: [{task_key: transform_silver_and_gold}, {task_key: transform_events}]
           environment_key: etl_v4
           spark_python_task:
             python_file: "../src/churn_pipeline/transformation/build_features.py"

@@ -47,7 +47,7 @@
 WITH events AS (
     -- All events up to and including the snapshot date (point-in-time boundary).
     SELECT *
-    FROM {{ ref('stg_events_bronze') }}
+    FROM {{ ref('telco_events_silver') }}
     WHERE event_ts < {{ upper_bound }}
 ),
 

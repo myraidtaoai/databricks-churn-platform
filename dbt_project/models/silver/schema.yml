@@ -55,3 +55,34 @@ models:
           combination_of_columns:
             - customer_id
             - snapshot_date
+
+  - name: telco_events_silver
+    description: >
+      Quality-gated events, one row per event_id. Built via incremental
+      MERGE (insert-only — events are immutable) from stg_events_bronze,
+      excluding rows that fail a QUARANTINE-severity rule. Equivalent to
+      telco_events_silver in the PySpark pipeline (transform_events.py).
+    columns:
+      - name: event_id
+        description: Primary key. Deterministic SHA-256 event identifier.
+        tests:
+          - not_null
+          - unique
+      - name: customer_id
+        tests:
+          - not_null
+      - name: event_type
+        tests:
+          - not_null
+          - accepted_values:
+              values:
+                - billing
+                - cancellation
+                - complaint
+                - payment
+                - plan_change
+                - support_call
+                - usage
+      - name: event_ts
+        tests:
+          - not_null

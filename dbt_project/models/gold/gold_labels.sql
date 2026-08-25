@@ -47,7 +47,7 @@ cancellations AS (
     SELECT DISTINCT
         customer_id,
         1 AS churned
-    FROM {{ ref('stg_events_bronze') }}
+    FROM {{ ref('telco_events_silver') }}
     WHERE event_type = 'cancellation'
       AND event_ts >= CAST(DATE_ADD({{ as_of }}, 1) AS TIMESTAMP)
       AND event_ts <  CAST(DATE_ADD({{ as_of }}, {{ horizon + 1 }}) AS TIMESTAMP)

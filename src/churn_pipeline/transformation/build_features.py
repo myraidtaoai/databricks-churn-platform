@@ -1,4 +1,4 @@
-"""Build point-in-time feature snapshots from the events Bronze table.
+"""Build point-in-time feature snapshots from the events Silver table.
 
 For a given ``as_of_date``, this job aggregates only events with
 ``event_ts <= as_of_date`` (strictly no future leakage).  The output is
@@ -59,7 +59,7 @@ as_of_date: date = (
 )
 
 # ── Load events up to (and including) as_of_date ─────────────────────
-events_table = table(args.catalog, args.schema, "telco_events_bronze")
+events_table = table(args.catalog, args.schema, "telco_events_silver")
 events = spark.table(events_table).filter(
     F.col("event_ts") <= F.lit(str(as_of_date) + "T23:59:59")
 )
@@ -294,14 +294,20 @@ snapshot = snapshot.withColumn(
 # ── Write to Gold ────────────────────────────────────────────────────
 gold_table = table(args.catalog, args.schema, "gold_feature_snapshot")
 
-# Overwrite only this snapshot_date partition (idempotent).
-(
-    snapshot.write.format("delta")
-    .mode("overwrite")
-    .option("replaceWhere", f"snapshot_date = '{as_of_date.isoformat()}'")
-    .option("mergeSchema", "true")
-    .saveAsTable(gold_table)
-)
+if spark.catalog.tableExists(gold_table):
+    # Overwrite only this snapshot_date partition (idempotent).
+    (
+        snapshot.write.format("delta")
+        .mode("overwrite")
+        .option("replaceWhere", f"snapshot_date = '{as_of_date.isoformat()}'")
+        .option("mergeSchema", "true")
+        .saveAsTable(gold_table)
+    )
+else:
+    # First run — replaceWhere requires an existing table, so create it directly.
+    snapshot.write.format("delta").mode("overwrite").option(
+        "overwriteSchema", "true"
+    ).saveAsTable(gold_table)
 
 row_count = snapshot.count()
 feature_count = len(
